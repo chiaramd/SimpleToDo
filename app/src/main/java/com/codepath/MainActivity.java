@@ -1,5 +1,6 @@
 package com.codepath;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -19,14 +20,18 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
-    //fyi: declare fields here
 
 
+    //constants for passing between activities
+    public static final int EDIT_REQUEST_CODE = 20;
+    public static final String ITEM_TEXT = "itemText";
+    public static final String ITEM_POSITION = "itemPosition";
+
+
+    //stateful objects declared here
+    //null before onCreate
     ArrayList<String> items;
     ArrayAdapter<String> itemsAdapter;
-    //RecyclerView rvItems;
-    //RecyclerView.Adapter mAdapter;
-    //RecyclerView.LayoutManager layoutManager;
     ListView lvItems;
 
 
@@ -35,22 +40,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //rvItems = (RecyclerView) findViewById(R.id.rvItems);
-        //layoutManager = new LinearLayoutManager(this);
-        //rvItems.setLayoutManager(layoutManager);
-
-        //mAdapter = new MyAdapter(myDataset);
-        //rvItems.setAdapter(mAdapter);
-
         readItems();
-        //items = new ArrayList<>();
+        //initializes adapter using the items list
         itemsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, items);
-        //rvItems.setAdapter(itemsAdapter);
+        //obtains reference to the listview in the layout
         lvItems = (ListView) findViewById(R.id.lvItems);
+        //wires the adapter to the view
         lvItems.setAdapter(itemsAdapter);
-
-        //items.add("First item");
-        //items.add("Second item");
 
         setupListViewListener();
     }
@@ -59,15 +55,17 @@ public class MainActivity extends AppCompatActivity {
     public void onAddItem(View v) {
         EditText etNewItem = (EditText) findViewById(R.id.etNewItem);
         String itemText = etNewItem.getText().toString();
+        //adds item to list via the adapter
         itemsAdapter.add(itemText);
         etNewItem.setText("");
         writeItems();
-        Toast.makeText(getApplicationContext(), "Item added to list", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getApplicationContext(), "New item added to your to-do list...better get to work!", Toast.LENGTH_SHORT).show();
 
     }
 
     private void setupListViewListener() {
-        Log.i("MainActivity", "Setting up listener on list view");
+
+        // long click listener:
         lvItems.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
 
@@ -76,7 +74,22 @@ public class MainActivity extends AppCompatActivity {
                 itemsAdapter.notifyDataSetChanged();
                 writeItems();
                 Log.i("MainActivity", "Removed item " + i);
+                Toast.makeText(getApplicationContext(), "Nice! You crossed an item off your to-do list!", Toast.LENGTH_SHORT).show();
                 return true;
+            }
+        });
+
+        //regular click listener:
+        lvItems.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+                Intent i = new Intent(MainActivity.this, EditItemActivity.class);
+                //extras are available for access in the new activity
+                i.putExtra(ITEM_TEXT, items.get(position));
+                i.putExtra(ITEM_POSITION, position);
+                Log.i("MainActivity", "editing item " + items.get(position));
+                //brings up edit activity with the expectation of a result
+                startActivityForResult(i, EDIT_REQUEST_CODE);
             }
         });
     }
@@ -84,6 +97,7 @@ public class MainActivity extends AppCompatActivity {
     private File getDataFile() {
         return new File(getFilesDir(), "todo.txt");
     }
+
     private void readItems() {
         try {
             items = new ArrayList<>(FileUtils.readLines(getDataFile(), Charset.defaultCharset()));
@@ -93,12 +107,26 @@ public class MainActivity extends AppCompatActivity {
             items = new ArrayList<>();
         }
     }
+
     private void writeItems() {
         try {
             FileUtils.writeLines(getDataFile(), items);
         } catch (IOException e) {
             //e.printStackTrace();
             Log.e("MainActivity", "Error writing file", e);
+        }
+    }
+    @Override
+    protected void onActivityResult (int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == RESULT_OK && requestCode == EDIT_REQUEST_CODE) {
+            String updatedItem = data.getExtras().getString(ITEM_TEXT);
+            int position = data.getExtras().getInt(ITEM_POSITION, 0);
+            items.set(position, updatedItem);
+            itemsAdapter.notifyDataSetChanged();
+            writeItems();
+            Toast.makeText(this, "Item updated", Toast.LENGTH_SHORT).show();
         }
     }
 }
